@@ -3,15 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 
-// Dynamically import Monaco Editor (Client-side only)
+// Dynamically import Monaco Editor
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
-const initialCode = `
-// Generate a triangle boundary with '*'
+const initialCode = `// Generate a triangle boundary
 function generateShape() {
-  let size = 5; // Change size as needed
+  let size = 5;
   let shape = "";
-  
   for (let i = 0; i < size; i++) {
     for (let j = 0; j <= i; j++) {
       if (j === 0 || j === i || i === size - 1) {
@@ -22,66 +20,97 @@ function generateShape() {
     }
     shape += "\\n";
   }
-
   return shape;
 }
-
-generateShape();
-`;
+console.log(generateShape());`;
 
 export default function Play() {
   const [code, setCode] = useState(initialCode);
   const [output, setOutput] = useState<string>("");
+  const workerRef = useRef<Worker | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Prevent tab switching
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.hidden) {
         alert("You switched tabs! You're eliminated.");
-        window.location.href = "/eliminated"; // Redirect to an elimination page
+        window.location.href = "/eliminated"; // Redirect to elimination page
       }
     };
     document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
   }, []);
 
+  // Run JavaScript securely inside a Web Worker
   const runCode = () => {
-    try {
-      // Create an isolated execution environment
-      const sandbox = new Function(`${code}\n return generateShape();`);
-      const result = sandbox();
+    if (workerRef.current) workerRef.current.terminate(); // Kill previous worker
+    setOutput("Running...");
 
-      // Set output to be displayed as preformatted text
-      setOutput(result);
-    } catch (error:any) {
-      setOutput(`Error: ${error.message}`);
-    }
+    workerRef.current = new Worker(
+      URL.createObjectURL(
+        new Blob(
+          [`
+          onmessage = function(e) {
+            let timeout = setTimeout(() => postMessage("Error: Execution timed out (possible infinite loop)."), 5000);
+            try {
+              let consoleOutput = [];
+              const customConsole = {
+                log: (...args) => consoleOutput.push(args.join(" ")),
+              };
+              
+              const func = new Function("console", e.data);
+              func(customConsole);
+              
+              clearTimeout(timeout); // Clear timeout if execution finishes in time
+              postMessage(consoleOutput.join("\\n"));
+            } catch (error) {
+              postMessage("Error: " + error.message);
+            }
+          };
+        `],
+          { type: "application/javascript" }
+        )
+      )
+    );
+
+    timeoutRef.current = setTimeout(() => {
+      if (workerRef.current) {
+        workerRef.current.terminate();
+        setOutput("Error: Execution timed out (possible infinite loop).");
+      }
+    }, 5000); // 5s timeout
+
+    workerRef.current.onmessage = (e) => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current); // Cancel timeout on successful execution
+      setOutput(e.data);
+    };
+
+    workerRef.current.postMessage(code);
   };
 
   return (
-    <div className="flex flex-col items-center p-6">
-      <h1 className="text-2xl font-bold mb-4">Dalgona Coding Challenge</h1>
-      <div className="flex w-full max-w-4xl gap-4">
-        {/* Code Editor */}
-        <div className="w-1/2 border rounded-lg overflow-hidden">
-          {MonacoEditor && (
-            <MonacoEditor
-              height="300px"
-              language="javascript"
-              theme="vs-dark"
-              value={code}
-              onChange={(value) => setCode(value || "")}
-            />
-          )}
-          <button onClick={runCode} className="w-full bg-blue-600 text-white p-2">
-            Run Code
-          </button>
-        </div>
+    <div className="flex h-screen">
+      {/* Left - Code Editor */}
+      <div className="w-1/2 h-full border-r border-gray-700">
+        {MonacoEditor && (
+          <MonacoEditor
+            height="100%"
+            language="javascript"
+            theme="vs-dark"
+            value={code}
+            onChange={(value) => setCode(value || "")}
+          />
+        )}
+        <button onClick={runCode} className="w-full bg-blue-600 text-white p-3 text-lg">
+          Run Code
+        </button>
+      </div>
 
-        {/* Output Display */}
-        <div className="w-1/2 border rounded-lg p-4 bg-black text-green-400 font-mono">
-          <pre>{output}</pre>
-        </div>
+      {/* Right - Output Display */}
+      <div className="w-1/2 h-full bg-black text-green-400 p-6 overflow-auto">
+        <h2 className="text-lg font-bold mb-2">Output:</h2>
+        <pre className="whitespace-pre-wrap">{output}</pre>
       </div>
     </div>
   );
