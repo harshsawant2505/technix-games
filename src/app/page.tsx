@@ -2,13 +2,18 @@
 
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
-import Cookies from "js-cookie"; // Import js-cookie
+import Cookies from "js-cookie";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
-const initialCode = `// Generate a triangle boundary
-function generateShape() {
-  let size = 5;
+// Function to generate a random size between 3 and 8
+const getRandomSize = () => Math.floor(Math.random() * 6) + 3;
+
+const generateTriangleCode = () => {
+  const size = getRandomSize();
+  return `
+// Generate a triangle boundary
+function generateShape(size) {
   let shape = "";
   for (let i = 0; i < size; i++) {
     for (let j = 0; j <= i; j++) {
@@ -22,33 +27,31 @@ function generateShape() {
   }
   return shape;
 }
-console.log(generateShape());`;
+console.log(generateShape(${size}));
+`;
+};
 
 export default function Play() {
-  const [code, setCode] = useState(initialCode);
+  const [code, setCode] = useState<string>(generateTriangleCode());
   const [output, setOutput] = useState<string>("");
 
   const workerRef = useRef<Worker | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const screenSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
 
-  // Check if eliminated cookie exists on mount
   useEffect(() => {
     if (Cookies.get("eliminated") === "true") {
-      window.location.href = "/eliminated"; // Redirect if eliminated
+      window.location.href = "/eliminated";
     }
   }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    screenSizeRef.current = {
-      width: window.screen.width,
-      height: window.screen.height,
-    };
+    screenSizeRef.current = { width: window.screen.width, height: window.screen.height };
 
     const handleElimination = () => {
-      Cookies.set("eliminated", "true", { expires: 1 }); // Set cookie for 1 day
+      Cookies.set("eliminated", "true", { expires: 1 });
       alert("You're eliminated!");
       window.location.href = "/eliminated";
     };
@@ -73,16 +76,18 @@ export default function Play() {
     };
   }, []);
 
-  // Run JavaScript securely inside a Web Worker
+  // Function to execute the code in a Web Worker
   const runCode = () => {
     if (workerRef.current) workerRef.current.terminate();
     setOutput("Running...");
 
+    const newCode = generateTriangleCode(); // Generate a new random size each run
+    setCode(newCode);
+
     workerRef.current = new Worker(
       URL.createObjectURL(
         new Blob(
-          [`
-          onmessage = function(e) {
+          [`onmessage = function(e) {
             let finished = false;
             let timeout = setTimeout(() => {
               if (!finished) postMessage("Error: Execution timed out (possible infinite loop).");
@@ -103,8 +108,7 @@ export default function Play() {
             } catch (error) {
               postMessage("Error: " + error.message);
             }
-          };
-        `],
+          };`],
           { type: "application/javascript" }
         )
       )
@@ -122,7 +126,7 @@ export default function Play() {
       setOutput(e.data);
     };
 
-    workerRef.current.postMessage(code);
+    workerRef.current.postMessage(newCode);
   };
 
   return (
@@ -138,7 +142,7 @@ export default function Play() {
             onChange={(value) => setCode(value || "")}
           />
         )}
-        <button onClick={runCode} className="w-full bg-blue-600 text-white p-3 text-lg">
+        <button onClick={runCode} className=" absolute right-4 rounded-sm top-4 bg-blue-600 text-white p-3 text-lg">
           Run Code
         </button>
       </div>
