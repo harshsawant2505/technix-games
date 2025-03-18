@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
+import Cookies from "js-cookie"; // Import js-cookie
 
-// Dynamically import Monaco Editor
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
 const initialCode = `// Generate a triangle boundary
@@ -27,24 +27,55 @@ console.log(generateShape());`;
 export default function Play() {
   const [code, setCode] = useState(initialCode);
   const [output, setOutput] = useState<string>("");
+
   const workerRef = useRef<Worker | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const screenSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
 
-  // Prevent tab switching
+  // Check if eliminated cookie exists on mount
   useEffect(() => {
+    if (Cookies.get("eliminated") === "true") {
+      window.location.href = "/eliminated"; // Redirect if eliminated
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    screenSizeRef.current = {
+      width: window.screen.width,
+      height: window.screen.height,
+    };
+
+    const handleElimination = () => {
+      Cookies.set("eliminated", "true", { expires: 1 }); // Set cookie for 1 day
+      alert("You're eliminated!");
+      window.location.href = "/eliminated";
+    };
+
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        alert("You switched tabs! You're eliminated.");
-        window.location.href = "/eliminated"; // Redirect to elimination page
+      if (document.hidden) handleElimination();
+    };
+
+    const handleResize = () => {
+      const { width, height } = screenSizeRef.current;
+      if (window.innerWidth < width * 0.95 || window.innerHeight < height * 0.95) {
+        handleElimination();
       }
     };
+
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("resize", handleResize);
+    };
   }, []);
 
   // Run JavaScript securely inside a Web Worker
   const runCode = () => {
-    if (workerRef.current) workerRef.current.terminate(); // Kill previous worker
+    if (workerRef.current) workerRef.current.terminate();
     setOutput("Running...");
 
     workerRef.current = new Worker(
@@ -52,7 +83,11 @@ export default function Play() {
         new Blob(
           [`
           onmessage = function(e) {
-            let timeout = setTimeout(() => postMessage("Error: Execution timed out (possible infinite loop)."), 5000);
+            let finished = false;
+            let timeout = setTimeout(() => {
+              if (!finished) postMessage("Error: Execution timed out (possible infinite loop).");
+            }, 5000);
+            
             try {
               let consoleOutput = [];
               const customConsole = {
@@ -62,7 +97,8 @@ export default function Play() {
               const func = new Function("console", e.data);
               func(customConsole);
               
-              clearTimeout(timeout); // Clear timeout if execution finishes in time
+              finished = true;
+              clearTimeout(timeout);
               postMessage(consoleOutput.join("\\n"));
             } catch (error) {
               postMessage("Error: " + error.message);
@@ -79,10 +115,10 @@ export default function Play() {
         workerRef.current.terminate();
         setOutput("Error: Execution timed out (possible infinite loop).");
       }
-    }, 5000); // 5s timeout
+    }, 5000);
 
     workerRef.current.onmessage = (e) => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current); // Cancel timeout on successful execution
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       setOutput(e.data);
     };
 
