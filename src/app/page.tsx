@@ -193,7 +193,7 @@ export default function Play() {
                         Input: <code>size = 5</code>
                       </p>
                       <pre className="bg-background p-2 rounded-md">
-                        * {"\n"}* * {"\n"}* * {"\n"}* * {"\n"}* * * * * {"\n"}
+                        * {"\n"}* * {"\n"}* * * {"\n"}* * * *{"\n"}* * * * * {"\n"}
                       </pre>
                     </div>
                     <div className="flex items-center p-3 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-800">
