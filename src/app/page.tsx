@@ -4,41 +4,26 @@ import { useState, useEffect, useRef } from "react"
 import dynamic from "next/dynamic"
 import Cookies from "js-cookie"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { PlayCircle, Clock, CheckCircle2, Info } from "lucide-react"
+import { PlayCircle } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import localFont from "next/font/local"
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false })
 
 // Function to generate a random size between 3 and 8
-const getRandomSize = () => Math.floor(Math.random() * 6) + 3
+//const getRandomSize = () => Math.floor(Math.random() * 6) + 3
 
-const generateTriangleCode = () => {
-  const size = getRandomSize()
-  return `
-// Generate a triangle boundary
-function generateShape(size) {
-  let shape = "";
-  for (let i = 0; i < size; i++) {
-    for (let j = 0; j <= i; j++) {
-      if (j === 0 || j === i || i === size - 1) {
-        shape += "* ";
-      } else {
-        shape += "  ";
-      }
-    }
-    shape += "\\n";
-  }
-  return shape;
-}
-console.log(generateShape(${size}));
-`
-}
+const squid = localFont({
+  src: '../fonts/squidfont.ttf',
+  variable: "--font-squid",
+  display: 'swap',
+})
 
 export default function Play() {
-  const [code, setCode] = useState<string>(generateTriangleCode())
+  const [selectedShape, setSelectedShape] = useState<string>("star")
+  const [code, setCode] = useState<string>("")
   const [output, setOutput] = useState<string>("")
-  const [activeTab, setActiveTab] = useState<string>("description")
+  //const [size, setSize] = useState<number>(getRandomSize())
 
   const workerRef = useRef<Worker | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -57,8 +42,8 @@ export default function Play() {
 
     const handleElimination = () => {
       Cookies.set("eliminated", "true", { expires: 1 })
-      alert("You're eliminated!")
-      window.location.href = "/eliminated"
+      //alert("You're eliminated!")
+      //window.location.href = "/eliminated"
     }
 
     const handleVisibilityChange = () => {
@@ -86,8 +71,7 @@ export default function Play() {
     if (workerRef.current) workerRef.current.terminate()
     setOutput("Running...")
 
-    const newCode = generateTriangleCode() // Generate a new random size each run
-    setCode(newCode)
+    //setSize(getRandomSize()) // Generate a new random size each run
 
     workerRef.current = new Worker(
       URL.createObjectURL(
@@ -133,35 +117,115 @@ export default function Play() {
       setOutput(e.data)
     }
 
-    workerRef.current.postMessage(newCode)
+    workerRef.current.postMessage(code)
+  }
+
+  const getPatternName = () => {
+    switch (selectedShape) {
+      case "triangle": return "Triangle";
+      case "star": return "Star";
+      case "heart": return "Heart";
+      case "hexagon": return "Hexagon";
+      default: return "Triangle";
+    }
+  }
+
+  const getPatternDescription = () => {
+    switch (selectedShape) {
+      case "star":
+        return (
+          <>
+            <p className="mb-4 text-white">
+              Write a function <code>generateShape</code> that displays the output given below in the console output.
+            </p>
+            <p className="mb-4 text-white">
+              NOTE: Using AI tools, Switching of tabs, reloading, or navigating away from the page will lead to direct elimination.
+            </p>
+            <div className="bg-black text-white border border-[rgba(255,255,255,0.2)] p-4 rounded-md mb-4">
+              <p className="font-semibold">Expected Output: </p>
+              <pre className="bg-black text-white mt-3 p-2 rounded-md">
+                  {"      *\n"}
+                  {"     * *\n"}
+                  {"    *   *\n"}
+                  {"*  *  *  *  *\n"}
+                  {"  *       *\n"}
+                  {" *         *\n"}
+                  {"*           *\n"}
+              </pre>
+            </div>
+          </>
+        );
+      case "heart":
+        return (
+          <>
+            <p className="mb-4 text-white">
+              Write a function <code>generateShape</code> that displays the output given below in the console output.
+            </p>
+            <p className="mb-4 text-white">
+              NOTE: Using AI tools, Switching of tabs, reloading, or navigating away from the page will lead to direct elimination.
+            </p>
+            <div className="bg-black text-white border border-[rgba(255,255,255,0.2)] p-4 rounded-md mb-4">
+              <p className="font-semibold">Expected Output: </p>
+              <pre className="bg-black text-white mt-3 p-2 rounded-md">
+                {"  ***   ***  \n"}
+                {" ***** ***** \n"}
+                {"*************\n"}
+                {" *********** \n"}
+                {"  *********  \n"}
+                {"   *******   \n"}
+                {"    *****    \n"}
+                {"     ***     \n"}
+                {"      *      \n"}
+              </pre>
+            </div>
+          </>
+        );
+      case "hexagon":
+        return (
+          <>
+            <p className="mb-4 text-white">
+              Write a function <code>generateShape</code> that displays the output given below in the console output.
+            </p>
+            <p className="mb-4 text-white">
+              NOTE: Using AI tools, Switching of tabs, reloading, or navigating away from the page will lead to direct elimination.
+            </p>
+            <div className="bg-black text-white border border-[rgba(255,255,255,0.2)] p-4 rounded-md mb-4">
+              <p className="font-semibold">Expected Output: </p>
+              <pre className="bg-black text-white mt-3 p-2 rounded-md">
+                {"    *****\n"}
+                {"   *******\n"}
+                {"  *********\n"}
+                {" ***********\n"}
+                {"*************\n"}
+                {" ***********\n"}
+                {"  *********\n"}
+                {"   *******\n"}
+                {"    *****\n"}
+              </pre>
+            </div>
+          </>
+        );
+      default:
+        return null;
+    }
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-screen bg-black text-white">
       {/* Header */}
-      <header className="border-b border-border bg-card px-6 py-3 flex items-center justify-between">
+      <header className="border-b border-border bg-black px-6 py-3 flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <h1 className="text-xl font-bold text-foreground">Triangle Pattern Generator</h1>
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <span className="px-2 py-1 bg-primary/10 text-primary rounded-md">Easy</span>
-            <span className="flex items-center">
-              <Clock className="w-4 h-4 mr-1" /> 5 min
-            </span>
-            <span className="flex items-center">
-              <CheckCircle2 className="w-4 h-4 mr-1" /> 85% Success
-            </span>
-          </div>
-        </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm">
-            Hint
-          </Button>
-          <Button variant="outline" size="sm">
-            Solution
-          </Button>
-          <Button variant="outline" size="sm">
-            Submissions
-          </Button>
+          <h1 className={`text-xl font-bold text-[#edcd8b] ${squid.className}`}>The Dalgona Challenge</h1>
+          <Select value={selectedShape} onValueChange={setSelectedShape}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select shape" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="star">Star</SelectItem>
+              <SelectItem value="heart">Heart</SelectItem>
+              <SelectItem value="hexagon">Hexagon</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </header>
 
@@ -169,64 +233,10 @@ export default function Play() {
       <div className="flex flex-1 overflow-hidden">
         {/* Left Panel - Problem Description */}
         <div className="w-2/5 border-r border-border overflow-y-auto p-4">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="description">Description</TabsTrigger>
-              <TabsTrigger value="solution">Solution</TabsTrigger>
-            </TabsList>
-            <TabsContent value="description" className="mt-4">
-              <Card>
-                <CardContent className="pt-6">
-                  <h2 className="text-xl font-bold mb-4">Triangle Pattern Generator</h2>
-                  <div className="prose prose-sm max-w-none text-muted-foreground">
-                    <p className="mb-4">
-                      Write a function <code>generateShape</code> that takes an integer <code>size</code> as input and
-                      returns a string representing a triangle pattern.
-                    </p>
-                    <p className="mb-4">
-                      The triangle should have <code>size</code> rows, and each row should have stars (*) at the
-                      boundary positions only.
-                    </p>
-                    <div className="bg-muted p-4 rounded-md mb-4">
-                      <h3 className="font-bold mb-2">Example:</h3>
-                      <p>
-                        Input: <code>size = 5</code>
-                      </p>
-                      <pre className="bg-background p-2 rounded-md">
-                        * {"\n"}* * {"\n"}*   * {"\n"}*     *{"\n"}* * * * * {"\n"}
-                      </pre>
-                    </div>
-                    <div className="flex items-center p-3 bg-yellow-50 border border-yellow-200 rounded-md text-yellow-800">
-                      <Info className="w-5 h-5 mr-2 text-yellow-600" />
-                      <p className="text-sm">
-                        Each time you run the code, a new random size between 3 and 8 will be generated.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-            <TabsContent value="solution" className="mt-4">
-              <Card>
-                <CardContent className="pt-6">
-                  <h2 className="text-xl font-bold mb-4">Solution Approach</h2>
-                  <div className="prose prose-sm max-w-none text-muted-foreground">
-                    <p className="mb-4">To solve this problem, we need to:</p>
-                    <ol className="list-decimal pl-5 mb-4">
-                      <li>Create a nested loop where the outer loop iterates through each row</li>
-                      <li>The inner loop iterates through each column in the current row</li>
-                      <li>
-                        Print a star (*) only at boundary positions: first column, last column of each row, or the last
-                        row
-                      </li>
-                      <li>Otherwise, print spaces</li>
-                    </ol>
-                    <p>The time complexity is O(n²) where n is the size of the triangle.</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+          <h2 className="text-xl font-bold mb-4">{getPatternName()} Pattern Generator</h2>
+          <div className="prose prose-sm max-w-none text-muted-foreground">
+            {getPatternDescription()}
+          </div>
         </div>
 
         {/* Right Panel - Code Editor and Output */}
@@ -255,7 +265,7 @@ export default function Play() {
           </div>
 
           {/* Output Display */}
-          <div className="h-1/3 bg-black p-4 overflow-auto">
+          <div className="h-1/2 bg-black p-4 overflow-auto">
             <div className="flex items-center mb-2 text-muted">
               <h2 className="text-sm font-medium">Console Output</h2>
             </div>
@@ -266,4 +276,3 @@ export default function Play() {
     </div>
   )
 }
-
