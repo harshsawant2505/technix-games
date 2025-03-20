@@ -1,7 +1,7 @@
 import localFont from 'next/font/local'
 
 const squid = localFont({
-  src: '../../fonts/squidfont.ttf',
+  src: '../fonts/squidfont.ttf',
   variable: "--font-squid",
   display: 'swap',
 })
